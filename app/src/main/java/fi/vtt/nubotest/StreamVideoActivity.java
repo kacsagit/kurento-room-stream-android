@@ -149,29 +149,6 @@ public class StreamVideoActivity extends Activity implements NBMWebRTCPeer.Obser
 
     @Override
     public void onBackPressed() {
-        // Data channel test code
-        /*DataChannel channel = nbmWebRTCPeer.getDataChannel("local", "test_channel_static");
-        if (channel.state() == DataChannel.State.OPEN) {
-            sendHelloMessage(channel);
-            Log.i(TAG, "[datachannel] Datachannel open, sending hello");
-        }
-        else {
-            Log.i(TAG, "[datachannel] Channel is not open! State: " + channel.state());
-        }
-        Log.i(TAG, "[DataChannel] Testing for existing channel");
-        DataChannel channel =  nbmWebRTCPeer.getDataChannel("local", "default");
-        if (channel == null) {
-            DataChannel.Init init = new DataChannel.Init();
-            init.negotiated = false;
-            init.ordered = true;
-            Log.i(TAG, "[DataChannel] Channel does not exist, creating...");
-            channel = nbmWebRTCPeer.createDataChannel("local", "test_channel", init);
-        }
-        else {
-            Log.i(TAG, "[DataChannel] Channel already exists. State: " + channel.state());
-            sendHelloMessage(channel);
-        }*/
-
         // If back button has not been pressed in a while then trigger thread and toast notification
         if (!this.backPressed) {
             this.backPressed = true;
@@ -206,20 +183,6 @@ public class StreamVideoActivity extends Activity implements NBMWebRTCPeer.Obser
         nbmWebRTCPeer.switchCameraPosition();
     }
 
-    private void GenerateOfferForRemote(String remote_name) {
-        nbmWebRTCPeer.generateOffer(remote_name, false);
-        callState = CallState.WAITING_REMOTE_USER;
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                mCallStatus.setText(R.string.waiting_remote_stream);
-            }
-        });
-    }
-
-    public void receiveFromRemote(View view) {
-        //GenerateOfferForRemote();
-    }
 
     /**
      * Terminates the current call and ends activity
@@ -247,12 +210,6 @@ public class StreamVideoActivity extends Activity implements NBMWebRTCPeer.Obser
             Log.d(TAG, "Sending " + sessionDescription.type);
             publishVideoRequestId = ++Constants.id;
             MainActivity.getKurentoRoomAPIInstance().sendPublishVideo(sessionDescription.description, false, publishVideoRequestId);
-        } else { // Asking for remote user video
-            Log.d(TAG, "Sending " + sessionDescription.type);
-            publishVideoRequestId = ++Constants.id;
-            String username = nbmPeerConnection.getConnectionId();
-            videoRequestUserMapping.put(publishVideoRequestId, username);
-            MainActivity.getKurentoRoomAPIInstance().sendReceiveVideoFrom(username, "webcam", sessionDescription.description, publishVideoRequestId);
         }
     }
 
@@ -265,9 +222,6 @@ public class StreamVideoActivity extends Activity implements NBMWebRTCPeer.Obser
         int sendIceCandidateRequestId = ++Constants.id;
         if (callState == CallState.PUBLISHING || callState == CallState.PUBLISHED) {
             MainActivity.getKurentoRoomAPIInstance().sendOnIceCandidate(this.username, iceCandidate.sdp,
-                    iceCandidate.sdpMid, Integer.toString(iceCandidate.sdpMLineIndex), sendIceCandidateRequestId);
-        } else {
-            MainActivity.getKurentoRoomAPIInstance().sendOnIceCandidate(nbmPeerConnection.getConnectionId(), iceCandidate.sdp,
                     iceCandidate.sdpMid, Integer.toString(iceCandidate.sdpMLineIndex), sendIceCandidateRequestId);
         }
     }
@@ -333,21 +287,6 @@ public class StreamVideoActivity extends Activity implements NBMWebRTCPeer.Obser
         sendHelloMessage(channel);
     }
 
-    private Runnable offerWhenReady = new Runnable() {
-        @Override
-        public void run() {
-            // Generate offers to receive video from all peers in the room
-            for (Map.Entry<String, Boolean> entry : MainActivity.userPublishList.entrySet()) {
-                if (entry.getValue()) {
-                    GenerateOfferForRemote(entry.getKey());
-                    Log.i(TAG, "I'm " + username + " DERP: Generating offer for peer " + entry.getKey());
-                    // Set value to false so that if this function is called again we won't
-                    // generate another offer for this user
-                    entry.setValue(false);
-                }
-            }
-        }
-    };
 
     @Override
     public void onRoomResponse(RoomResponse response) {
@@ -363,14 +302,8 @@ public class StreamVideoActivity extends Activity implements NBMWebRTCPeer.Obser
             if (callState == CallState.PUBLISHING) {
                 callState = CallState.PUBLISHED;
                 nbmWebRTCPeer.processAnswer(sd, "local");
-                mHandler.postDelayed(offerWhenReady, 2000);
 
-                // Check if we are waiting for the video publication of the other peer
-            } else if (callState == CallState.WAITING_REMOTE_USER) {
-                //String user_name = Integer.toString(publishVideoRequestId);
-                callState = CallState.RECEIVING_REMOTE_USER;
-                String connectionId = videoRequestUserMapping.get(publishVideoRequestId);
-                nbmWebRTCPeer.processAnswer(sd, connectionId);
+
             }
         }
 
@@ -394,15 +327,9 @@ public class StreamVideoActivity extends Activity implements NBMWebRTCPeer.Obser
 
             if (callState == CallState.PUBLISHING || callState == CallState.PUBLISHED) {
                 nbmWebRTCPeer.addRemoteIceCandidate(ic, "local");
-            } else {
-                nbmWebRTCPeer.addRemoteIceCandidate(ic, notification.getParam("endpointName").toString());
             }
         }
 
-        // Somebody in the room published their video
-        else if (notification.getMethod().equals(RoomListener.METHOD_PARTICIPANT_PUBLISHED)) {
-            mHandler.postDelayed(offerWhenReady, 2000);
-        }
     }
 
     @Override

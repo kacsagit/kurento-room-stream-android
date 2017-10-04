@@ -29,7 +29,6 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import org.webrtc.DataChannel;
 import org.webrtc.EglBase;
@@ -165,32 +164,6 @@ public class WatchVideoActivity extends Activity implements NBMWebRTCPeer.Observ
         return super.onOptionsItemSelected(item);
     }
 
-
-    @Override
-    public void onBackPressed() {
-        // If back button has not been pressed in a while then trigger thread and toast notification
-        if (!this.backPressed){
-            this.backPressed = true;
-            Toast.makeText(this,"Press back again to end.",Toast.LENGTH_SHORT).show();
-            this.backPressedThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        Thread.sleep(1000);
-                        backPressed = false;
-                    } catch (InterruptedException e){ Log.d("VCA-oBP","Successfully interrupted"); }
-                }
-            });
-            this.backPressedThread.start();
-        }
-        // If button pressed the second time then call super back pressed
-        // (eventually calls onDestroy)
-        else {
-            if (this.backPressedThread != null)
-                this.backPressedThread.interrupt();
-            super.onBackPressed();
-        }
-    }
 
     public void hangup(View view) {
         finish();
